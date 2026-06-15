@@ -24,7 +24,7 @@ jobs:
             -   name: Setup Java
                 uses: ./.github/actions/java-setup
                 with:
-                    cache: ""
+                    cache: "maven"
             -   name: Pre-commit checks
                 uses: pre-commit/action@v3.0.1
             -   name: pre-commit-c-lite
