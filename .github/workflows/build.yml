@@ -27,6 +27,8 @@ jobs:
                     cache: "maven"
             -   name: Pre-commit checks
                 uses: pre-commit/action@v3.0.1
+                env:
+                    SKIP: maven,maven-spotless-apply
             -   name: pre-commit-c-lite
                 uses: pre-commit-ci/lite-action@v1.1.0
                 if: always()
