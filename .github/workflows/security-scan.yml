@@ -199,11 +199,37 @@ jobs:
       - name: Build Docker image
         run: docker build -t webgoat:${{ github.sha }} .
 
-      - name: Scan container image with Trivy
+      - name: Save Docker image as tar
+        run: docker save webgoat:${{ github.sha }} -o webgoat-image.tar
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: docker-image
+          path: webgoat-image.tar
+
+  # ---------------------------------------------------------------
+  # 5. Container Image Scan - independent of security gate
+  # ---------------------------------------------------------------
+  image-scan:
+    name: Container Image Scan
+    runs-on: ubuntu-latest
+    needs: [build]
+    steps:
+      - name: Download Docker image
+        uses: actions/download-artifact@v4
+        with:
+          name: docker-image
+
+      - name: Load Docker image
+        run: docker load -i webgoat-image.tar
+
+      - name: Install Trivy
+        run: curl -sSfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
+
+      - name: Scan container image
         id: image-scan
         continue-on-error: true
         run: |
-          curl -sSfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
           trivy image \
             --format json \
             --output trivy-image-report.json \
@@ -218,12 +244,9 @@ jobs:
           name: trivy-image-report
           path: trivy-image-report.json
 
-      - name: Fail on image CRITICAL/HIGH findings
+      - name: Fail on CRITICAL/HIGH findings
         if: steps.image-scan.outcome == 'failure'
         run: |
-          GATE="${{ inputs.security_gate }}"
-          GATE="${GATE:-true}"
-
           COUNT=$(python3 -c "
           import json
           data = json.load(open('trivy-image-report.json'))
@@ -231,10 +254,4 @@ jobs:
           print(len(vulns))
           ")
           echo "Found $COUNT CRITICAL/HIGH vulnerabilities in container image"
-
-          if [ "$GATE" = "false" ]; then
-            echo "::warning::Security gate is DISABLED. Ignoring image scan findings."
-            exit 0
-          fi
-
           exit 1
