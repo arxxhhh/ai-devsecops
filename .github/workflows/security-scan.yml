@@ -65,16 +65,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install Trivy
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
+
       - name: Run Trivy fs scan
-        uses: aquasecurity/trivy-action@master
-        with:
-          scan-type: fs
-          scan-ref: .
-          format: json
-          output: trivy-report.json
-          exit-code: "0"
-          severity: "CRITICAL,HIGH"
-          quiet: "true"
+        run: |
+          trivy fs . \
+            --format json \
+            --output trivy-report.json \
+            --severity CRITICAL,HIGH \
+            --quiet || true
 
       - uses: actions/upload-artifact@v4
         if: always()
@@ -85,7 +86,7 @@ jobs:
       - name: Fail on CRITICAL/HIGH findings
         run: |
           COUNT=$(python3 -c "
-          import json, sys
+          import json
           data = json.load(open('trivy-report.json'))
           vulns = [v for r in (data.get('Results') or []) for v in (r.get('Vulnerabilities') or []) if v.get('Severity') in ('CRITICAL','HIGH')]
           print(len(vulns))
