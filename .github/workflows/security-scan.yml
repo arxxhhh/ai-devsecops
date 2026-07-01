@@ -10,6 +10,7 @@ jobs:
   gitleaks:
     name: Gitleaks
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v4
         with:
@@ -23,12 +24,16 @@ jobs:
 
       - name: Run Gitleaks
         run: |
-          gitleaks detect --source . --redact --no-banner \
+          gitleaks detect \
+            --source . \
+            --redact \
+            --no-banner \
             --report-format json \
             --report-path gitleaks-report.json
 
-      - uses: actions/upload-artifact@v4
+      - name: Upload Gitleaks Report
         if: always()
+        uses: actions/upload-artifact@v4
         with:
           name: gitleaks-report
           path: gitleaks-report.json
@@ -36,8 +41,10 @@ jobs:
   semgrep:
     name: Semgrep
     runs-on: ubuntu-latest
+
     container:
       image: semgrep/semgrep:latest
+
     steps:
       - uses: actions/checkout@v4
 
@@ -47,14 +54,15 @@ jobs:
             --config p/java \
             --config p/owasp-top-ten \
             --severity ERROR \
-            --severity WARNING \
+            --error \
             --json \
             --output semgrep-report.json \
             --quiet \
             .
 
-      - uses: actions/upload-artifact@v4
+      - name: Upload Semgrep Report
         if: always()
+        uses: actions/upload-artifact@v4
         with:
           name: semgrep-report
           path: semgrep-report.json
@@ -62,49 +70,47 @@ jobs:
   trivy:
     name: Trivy
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Trivy
-        run: |
-          curl -sSfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
+      - name: Run Trivy Filesystem Scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: fs
+          scan-ref: .
+          format: json
+          output: trivy-report.json
+          severity: CRITICAL,HIGH
+          exit-code: "1"
+          quiet: true
 
-      - name: Run Trivy fs scan
-        run: |
-          trivy fs . \
-            --format json \
-            --output trivy-report.json \
-            --severity CRITICAL,HIGH \
-            --quiet || true
-
-      - uses: actions/upload-artifact@v4
+      - name: Upload Trivy Report
         if: always()
+        uses: actions/upload-artifact@v4
         with:
           name: trivy-report
           path: trivy-report.json
 
-      - name: Fail on CRITICAL/HIGH findings
-        run: |
-          COUNT=$(python3 -c "
-          import json
-          data = json.load(open('trivy-report.json'))
-          vulns = [v for r in (data.get('Results') or []) for v in (r.get('Vulnerabilities') or []) if v.get('Severity') in ('CRITICAL','HIGH')]
-          print(len(vulns))
-          ")
-          echo "Found $COUNT CRITICAL/HIGH vulnerabilities"
-          [ "$COUNT" -gt 0 ] && exit 1 || exit 0
-
   publish-reports:
     name: Publish Reports
     runs-on: ubuntu-latest
-    needs: [gitleaks, semgrep, trivy]
+
+    needs:
+      - gitleaks
+      - semgrep
+      - trivy
+
     if: always()
+
     steps:
-      - uses: actions/download-artifact@v4
+      - name: Download Reports
+        uses: actions/download-artifact@v4
         with:
           path: reports
 
-      - uses: actions/upload-artifact@v4
+      - name: Upload Combined Reports
+        uses: actions/upload-artifact@v4
         with:
           name: all-security-reports
           path: reports/
@@ -112,15 +118,20 @@ jobs:
   build:
     name: Build
     runs-on: ubuntu-latest
-    needs: [gitleaks, semgrep, trivy]
+
+    needs:
+      - gitleaks
+      - semgrep
+      - trivy
+
     steps:
       - uses: actions/checkout@v4
 
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
-          java-version: "21"
           distribution: temurin
+          java-version: "21"
 
       - name: Build with Maven
         run: ./mvnw package -DskipTests -q
