@@ -77,7 +77,17 @@ jobs:
       - name: Run Trivy scan
         id: trivy
         continue-on-error: true
-        run: bash scripts/trivy-scan.sh
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
+          trivy fs . --format json --output trivy-report.json --severity CRITICAL,HIGH --quiet
+          COUNT=$(python3 -c "
+          import json
+          data = json.load(open('trivy-report.json'))
+          vulns = [v for r in (data.get('Results') or []) for v in (r.get('Vulnerabilities') or []) if v.get('Severity') in ('CRITICAL','HIGH')]
+          print(len(vulns))
+          ")
+          echo "Found $COUNT CRITICAL/HIGH vulnerabilities"
+          [ "$COUNT" -gt 0 ] && exit 1 || exit 0
 
       - name: Upload Trivy Report
         if: always()
