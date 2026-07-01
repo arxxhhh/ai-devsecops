@@ -66,6 +66,8 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Run Trivy fs scan
+        continue-on-error: true
+        id: trivy
         uses: aquasecurity/trivy-action@master
         with:
           scan-type: fs
@@ -81,6 +83,10 @@ jobs:
         with:
           name: trivy-report
           path: trivy-report.json
+
+      - name: Fail on CRITICAL/HIGH findings
+        if: steps.trivy.outcome == 'failure'
+        run: exit 1
 
   publish-reports:
     name: Publish Reports
