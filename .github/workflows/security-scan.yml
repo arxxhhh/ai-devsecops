@@ -185,7 +185,11 @@ jobs:
 
           echo "All scans passed. Proceeding with build."
 
-      - name: Build step
-        run: |
-          echo "Running build..."
-          # your actual build commands go here
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Build with Maven
+        run: ./mvnw package -DskipTests -q
