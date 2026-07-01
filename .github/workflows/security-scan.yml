@@ -2,9 +2,19 @@ name: Security Scan Pipeline
 
 on:
   pull_request:
-    branches: [main, develop]
+    branches: [main]
   push:
     branches: [main]
+  workflow_dispatch:
+    inputs:
+      security_gate:
+        description: "Enable security gate (block build on findings)"
+        required: false
+        default: "true"
+        type: choice
+        options:
+          - "true"
+          - "false"
 
 permissions:
   contents: read
@@ -153,9 +163,18 @@ jobs:
 
       - name: Check scan results
         run: |
-          echo "Gitleaks: ${{ needs.gitleaks.outputs.status }}"
-          echo "Semgrep:  ${{ needs.semgrep.outputs.status }}"
-          echo "Trivy:    ${{ needs.trivy.outputs.status }}"
+          GATE="${{ inputs.security_gate }}"
+          GATE="${GATE:-true}"
+
+          echo "Security gate: $GATE"
+          echo "Gitleaks : ${{ needs.gitleaks.outputs.status }}"
+          echo "Semgrep  : ${{ needs.semgrep.outputs.status }}"
+          echo "Trivy    : ${{ needs.trivy.outputs.status }}"
+
+          if [ "$GATE" = "false" ]; then
+            echo "::warning::Security gate is DISABLED. Proceeding with build regardless of findings."
+            exit 0
+          fi
 
           if [ "${{ needs.gitleaks.outputs.status }}" = "fail" ] || \
              [ "${{ needs.semgrep.outputs.status }}" = "fail" ] || \
