@@ -74,16 +74,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Run Trivy Filesystem Scan
-        uses: aquasecurity/trivy-action@master
-        with:
-          scan-type: fs
-          scan-ref: .
-          format: json
-          output: trivy-report.json
-          severity: CRITICAL,HIGH
-          exit-code: "1"
-          quiet: true
+      - name: Run Trivy scan
+        id: trivy
+        continue-on-error: true
+        run: bash scripts/trivy-scan.sh
 
       - name: Upload Trivy Report
         if: always()
@@ -91,6 +85,10 @@ jobs:
         with:
           name: trivy-report
           path: trivy-report.json
+
+      - name: Fail if vulnerabilities found
+        if: steps.trivy.outcome == 'failure'
+        run: exit 1
 
   publish-reports:
     name: Publish Reports
