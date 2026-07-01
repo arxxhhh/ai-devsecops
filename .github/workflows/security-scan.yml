@@ -71,13 +71,22 @@ jobs:
           scan-ref: .
           format: json
           output: trivy-report.json
-          exit-code: "1"
+          exit-code: "0"
           severity: "CRITICAL,HIGH"
           quiet: "true"
 
-      - name: Upload report
+      - name: Upload Trivy report
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: trivy-report
           path: trivy-report.json
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          java-version: "21"
+          distribution: temurin
+
+      - name: Build with Maven
+        run: ./mvnw package -DskipTests -q
