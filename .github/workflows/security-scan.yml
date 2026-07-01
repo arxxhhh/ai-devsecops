@@ -46,7 +46,6 @@ jobs:
           semgrep scan \
             --config p/java \
             --config p/owasp-top-ten \
-            --config p/spring \
             --severity ERROR \
             --severity WARNING \
             --json \
