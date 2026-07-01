@@ -2,7 +2,7 @@ name: Security Scan Pipeline
 
 on:
   pull_request:
-    branches: [main]
+    branches: [main, develop]
   push:
     branches: [main]
 
@@ -71,7 +71,10 @@ jobs:
         id: semgrep
         continue-on-error: true
         run: |
-          semgrep scan --config auto \
+          semgrep scan --config p/owasp-top-ten \
+                        --config p/java \
+                        --config p/security-audit \
+                        --config p/secrets \
                         --json \
                         --output semgrep-report.json \
                         || true
@@ -109,7 +112,7 @@ jobs:
 
       - name: Run Trivy
         id: trivy
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           scan-type: fs
           scan-ref: .
