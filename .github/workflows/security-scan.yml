@@ -193,3 +193,37 @@ jobs:
 
       - name: Build with Maven
         run: ./mvnw package -DskipTests -q
+
+      - name: Build Docker image
+        run: docker build -t webgoat:${{ github.sha }} .
+
+      - name: Scan container image with Trivy
+        id: image-scan
+        continue-on-error: true
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
+          trivy image \
+            --format json \
+            --output trivy-image-report.json \
+            --severity CRITICAL,HIGH \
+            --quiet \
+            webgoat:${{ github.sha }}
+
+      - name: Upload image scan report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: trivy-image-report
+          path: trivy-image-report.json
+
+      - name: Fail on image CRITICAL/HIGH findings
+        if: steps.image-scan.outcome == 'failure'
+        run: |
+          COUNT=$(python3 -c "
+          import json
+          data = json.load(open('trivy-image-report.json'))
+          vulns = [v for r in (data.get('Results') or []) for v in (r.get('Vulnerabilities') or []) if v.get('Severity') in ('CRITICAL','HIGH')]
+          print(len(vulns))
+          ")
+          echo "Found $COUNT CRITICAL/HIGH vulnerabilities in container image"
+          exit 1
