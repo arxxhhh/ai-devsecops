@@ -221,6 +221,9 @@ jobs:
       - name: Fail on image CRITICAL/HIGH findings
         if: steps.image-scan.outcome == 'failure'
         run: |
+          GATE="${{ inputs.security_gate }}"
+          GATE="${GATE:-true}"
+
           COUNT=$(python3 -c "
           import json
           data = json.load(open('trivy-image-report.json'))
@@ -228,4 +231,10 @@ jobs:
           print(len(vulns))
           ")
           echo "Found $COUNT CRITICAL/HIGH vulnerabilities in container image"
+
+          if [ "$GATE" = "false" ]; then
+            echo "::warning::Security gate is DISABLED. Ignoring image scan findings."
+            exit 0
+          fi
+
           exit 1
