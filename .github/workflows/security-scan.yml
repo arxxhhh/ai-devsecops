@@ -66,15 +66,13 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Run Trivy fs scan
-        continue-on-error: true
-        id: trivy
         uses: aquasecurity/trivy-action@master
         with:
           scan-type: fs
           scan-ref: .
           format: json
           output: trivy-report.json
-          exit-code: "1"
+          exit-code: "0"
           severity: "CRITICAL,HIGH"
           quiet: "true"
 
@@ -85,8 +83,15 @@ jobs:
           path: trivy-report.json
 
       - name: Fail on CRITICAL/HIGH findings
-        if: steps.trivy.outcome == 'failure'
-        run: exit 1
+        run: |
+          COUNT=$(python3 -c "
+          import json, sys
+          data = json.load(open('trivy-report.json'))
+          vulns = [v for r in (data.get('Results') or []) for v in (r.get('Vulnerabilities') or []) if v.get('Severity') in ('CRITICAL','HIGH')]
+          print(len(vulns))
+          ")
+          echo "Found $COUNT CRITICAL/HIGH vulnerabilities"
+          [ "$COUNT" -gt 0 ] && exit 1 || exit 0
 
   publish-reports:
     name: Publish Reports
