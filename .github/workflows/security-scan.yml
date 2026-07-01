@@ -192,7 +192,9 @@ jobs:
           java-version: "21"
 
       - name: Build with Maven
-        run: ./mvnw package -DskipTests -q
+        run: |
+          chmod +x mvnw
+          ./mvnw package -DskipTests -q
 
       - name: Build Docker image
         run: docker build -t webgoat:${{ github.sha }} .
