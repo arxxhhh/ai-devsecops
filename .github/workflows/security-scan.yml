@@ -39,6 +39,8 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Run Semgrep
+        continue-on-error: true
+        id: semgrep-scan
         run: |
           semgrep scan \
             --config p/java \
@@ -58,6 +60,10 @@ jobs:
           name: semgrep-report
           path: semgrep-report.json
 
+      - name: Fail job if Semgrep found vulnerabilities
+        if: steps.semgrep-scan.outcome == 'failure'
+        run: exit 1
+
   trivy:
     name: Trivy
     runs-on: ubuntu-latest
@@ -66,6 +72,8 @@ jobs:
 
       - name: Run Trivy fs scan
         uses: aquasecurity/trivy-action@master
+        continue-on-error: true
+        id: trivy-scan
         with:
           scan-type: fs
           scan-ref: .
@@ -74,6 +82,10 @@ jobs:
           exit-code: "1"
           severity: "CRITICAL,HIGH"
           quiet: "true"
+
+      - name: Fail job if Trivy found vulnerabilities
+        if: steps.trivy-scan.outcome == 'failure'
+        run: exit 1
 
       - name: Upload report
         if: always()
